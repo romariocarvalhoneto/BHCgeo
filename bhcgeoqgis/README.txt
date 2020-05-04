@@ -1,32 +1,6 @@
-Plugin Builder Results
+BHCgeo
 
-Your plugin BHCgeo_QGIS was created in:
-    C:/BHCplugin/Qgis3.6\bhcgeoqgis
+The Climatic Water Balance (CWB or BHC in portuguese) of Thornthwaite and Mather (1955) is a soil water monitoring method that considers the soil as an active ingredient in its calculation as a reservoir that hinders the exit of water as it dries. In periods where the total Precipitation (P) is less than the Potential Evapotranspiration (PET), the retained water becomes a function of this potential demand (P-PET < 0) and of the Available Water Capacity (AWC) used in the calculations. If there is a sequence of periods in this condition, the water retained in the soil will be a sequential function of the accumulated negative values of P - PET, that is, the accumulated potential loss. Therefore, this Plugin needs as input, 12 rasters of P, 12 rasters of ETP and one raster of the AWC, being these 12 rasters one raster for each month of the year.
 
-Your QGIS plugin directory is located at:
+Your BHCgeo QGIS plugin directory is located at:
     C:/Users/Dell/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins
-
-What's Next:
-
-  * Copy the entire directory containing your new plugin to the QGIS plugin
-    directory
-
-  * Compile the resources file using pyrcc5
-
-  * Run the tests (``make test``)
-
-  * Test the plugin by enabling it in the QGIS plugin manager
-
-  * Customize it by editing the implementation file: ``BHCgeoQGIS.py``
-
-  * Create your own custom icon, replacing the default icon.png
-
-  * Modify your user interface by opening BHCgeo_QGIS_dialog_base.ui in Qt Designer
-
-  * You can use the Makefile to compile your Ui and resource files when
-    you make changes. This requires GNU make (gmake)
-
-For more information, see the PyQGIS Developer Cookbook at:
-http://www.qgis.org/pyqgis-cookbook/index.html
-
-(C) 2011-2018 GeoApt LLC - geoapt.com
