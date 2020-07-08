@@ -21,15 +21,16 @@
  *                                                                         *
  ***************************************************************************/
 """
-from PyQt5.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
+from PyQt5 import QtGui
+from PyQt5.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, Qt
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QAction, QFileDialog
-
-from qgis.core import Qgis
+from PyQt5.QtWidgets import QAction, QFileDialog, QDialog, QProgressBar
+from PyQt5.QtWidgets import *
+from qgis.utils import iface
+from qgis.core import Qgis, QgsProject, QgsTask, QgsApplication
 import gdal, osr, io
 import numpy as np 
 from math import *
-
 # Initialize Qt resources from file resources.py
 from .resources import *
 # Import the code for the dialog
@@ -187,8 +188,8 @@ class BHCgeo_QGIS:
             self.iface.removeToolBarIcon(action)
 
     def select_output_file(self):      
-        filename = QFileDialog.getExistingDirectory(self.dlg, ("Choose the output folder"))
-        self.dlg.lineEdit.setText(filename)
+        filename = QFileDialog.getExistingDirectory(BHCgeo_QGIS.dlg, ("Choose the output folder"))
+        BHCgeo_QGIS.dlg.lineEdit.setText(filename)
 
     def run(self):
         """Run method that performs all the real work"""
@@ -197,10 +198,10 @@ class BHCgeo_QGIS:
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
             self.first_start = False
-            self.dlg = BHCgeo_QGISDialog()
-            self.dlg.pushButton.clicked.connect(self.select_output_file)
+            BHCgeo_QGIS.dlg = BHCgeo_QGISDialog()
+            BHCgeo_QGIS.dlg.pushButton.clicked.connect(self.select_output_file)
         
-        self.dlg.comboBox.clear()                          
+        BHCgeo_QGIS.dlg.comboBox.clear()                          
         
         # meses_list = ["January","February","March","April",
                         # "May","June","July","August","September",
@@ -218,178 +219,235 @@ class BHCgeo_QGIS:
                         QCoreApplication.translate('self.dlg.comboBox', "November"),
                         QCoreApplication.translate('self.dlg.comboBox', "December")] 
 
-        self.dlg.comboBox.addItems(meses_list)
+        BHCgeo_QGIS.dlg.comboBox.addItems(meses_list)
         
         # show the dialog
-        self.dlg.show()
+        BHCgeo_QGIS.dlg.show()
         # Run the dialog event loop
-        result = self.dlg.exec_()
+        result = BHCgeo_QGIS.dlg.exec_()
         # See if OK was pressed
         if result:
+            BHCgeo_QGIS.progress_bar = ProgessBar()
+            BHCgeo_QGIS.progress_bar.show()
+            
 
-            pastaSelecionada = self.dlg.lineEdit.text()  
-            diretorio = pastaSelecionada+"\\"
-             
-            listaMesDesordenada = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] 
-            nomeMes = []
-            mesEscolhidoIndex = self.dlg.comboBox.currentIndex()
 
-            cont = mesEscolhidoIndex
-            for mes in range(len(listaMesDesordenada) - mesEscolhidoIndex):
-                nomeMes.append(listaMesDesordenada[cont])
-                cont += 1
-            cont = 0
-            for mes in range(mesEscolhidoIndex):
-                nomeMes.append(listaMesDesordenada[cont]) 
-                cont += 1
-            #-----------------------------------------------------------
+class HeavyTask(QgsTask):
+    """Here we subclass QgsTask"""
+    def __init__(self, desc):
+        QgsTask.__init__(self, desc)
 
-            NoData = -9999
-            CAD_raster = gdal.Open(diretorio+"cad.tif")   
-            bandaUnicaCAD = CAD_raster.GetRasterBand(1)
-            bandaUnicaCAD.SetNoDataValue(NoData)
-            CAD_array = np.array(bandaUnicaCAD.ReadAsArray())
-            CAD_list = []
-            CAD_list.append(CAD_array.tolist())
-            ETP_list = [[] for mes in nomeMes]
-            P_list = [[] for mes in nomeMes]
 
-            contMes = 0
-            for mes in nomeMes:
-                ETP_raster = gdal.Open(diretorio+"etp"+mes+".tif")   
-                bandaUnicaETP = ETP_raster.GetRasterBand(1)
-                bandaUnicaETP.SetNoDataValue(NoData)
-                ETP_array = np.array(bandaUnicaETP.ReadAsArray()) 
-                ETP_listMes = ETP_array.tolist()
-                ETP_list[contMes].append(ETP_listMes)
-                P_raster = gdal.Open(diretorio+"p"+mes+".tif")   
-                bandaUnicaP = P_raster.GetRasterBand(1)
-                bandaUnicaP.SetNoDataValue(NoData)
-                P_array = np.array(bandaUnicaP.ReadAsArray()) 
-                P_listMes = P_array.tolist()
-                P_list[contMes].append(P_listMes)
-                contMes += 1
+    def array2raster(self,rasterfn,newRasterfn,array):
+        raster = gdal.Open(rasterfn) #raster modelo
+        geotransform = raster.GetGeoTransform()
+        originX = geotransform[0] 
+        originY = geotransform[3]
+        pixelWidth = self.instantiatePixelWidth
+        pixelHeight = self.instantiatePixelHeight
+        cols = raster.RasterXSize
+        rows = raster.RasterYSize
 
-            # ---------------- Verificando as condicoes para fazer os calculos ---------------------------
+        driver = gdal.GetDriverByName('GTiff')
+        outRaster = driver.Create(newRasterfn, cols, rows, 1, gdal.GDT_Float32)
+        outRaster.SetGeoTransform((originX, pixelWidth, 0, originY, 0, pixelHeight))
+        outband = outRaster.GetRasterBand(1)
+        outband.WriteArray(array)
+        outband.SetNoDataValue(self.NoData) #nao insere valor de NoData, mas sim, escolhe um valor dentre os existentes
+        outRasterSRS = osr.SpatialReference()
+        outRasterSRS.ImportFromWkt(raster.GetProjectionRef())
+        outRaster.SetProjection(outRasterSRS.ExportToWkt())
+        outband.FlushCache()
+        return newRasterfn
 
-            for mes in nomeMes:
-                CAD_raster = gdal.Open(diretorio+"cad.tif")
-                ETP_raster = gdal.Open(diretorio+"etp"+mes+".tif") 
-                P_raster = gdal.Open(diretorio+"p"+mes+".tif")
-                assert CAD_raster.RasterXSize == ETP_raster.RasterXSize == P_raster.RasterXSize 
-                assert CAD_raster.RasterYSize == ETP_raster.RasterYSize == P_raster.RasterYSize 
+    def run(self):
+        """This function is where you do the 'heavy lifting' or implement
+        the task which you want to run in a background thread. This function 
+        must return True or False and should only interact with the main thread
+        via signals"""
+        
+        percent = 0
+        self.setProgress(percent)
 
-            #-------------------- Substituindo valores de CAD = 0 por NoData ------------------------------
+        BHCgeo_QGIS.pastaSelecionada = BHCgeo_QGIS.dlg.lineEdit.text()
+        self.diretorio = BHCgeo_QGIS.pastaSelecionada+"\\"
+         
+        listaMesDesordenada = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] 
+        self.nomeMes = []
+        BHCgeo_QGIS.mesEscolhidoIndex = BHCgeo_QGIS.dlg.comboBox.currentIndex()   # <-----
 
-            for matriz in range(len(CAD_list)):
-                for row in range(len(CAD_list[matriz])):
-                    for i in range(len(CAD_list[matriz][row])):
-                        if CAD_list[matriz][row][i] == 0:
-                            CAD_list[matriz][row].pop(i)    # retira o cad 0 e substitui por NODATA
-                            CAD_list[matriz][row].insert(i,NoData)            
+        cont = BHCgeo_QGIS.mesEscolhidoIndex
+        for mes in range(len(listaMesDesordenada) - BHCgeo_QGIS.mesEscolhidoIndex):
+            self.nomeMes.append(listaMesDesordenada[cont])
+            cont += 1
+        cont = 0
+        for mes in range(BHCgeo_QGIS.mesEscolhidoIndex):
+            self.nomeMes.append(listaMesDesordenada[cont]) 
+            cont += 1
+        #-----------------------------------------------------------
 
-            #-------------------- Retirando as linhas que vem do formato array ------------------------------
+        self.NoData = -9999
+        CAD_raster = gdal.Open(self.diretorio+"cad.tif")   
+        bandaUnicaCAD = CAD_raster.GetRasterBand(1)
+        bandaUnicaCAD.SetNoDataValue(self.NoData)
+        CAD_array = np.array(bandaUnicaCAD.ReadAsArray())
+        CAD_list = []
+        CAD_list.append(CAD_array.tolist())
+        ETP_list = [[] for mes in self.nomeMes]
+        P_list = [[] for mes in self.nomeMes]
 
-            CADFloatAll = []
-            ETPFloatAll = [[] for mes in nomeMes]
-            PFloatAll = [[] for mes in nomeMes]
+        contMes = 0
+        for mes in self.nomeMes:
+            ETP_raster = gdal.Open(self.diretorio+"etp"+mes+".tif")   
+            bandaUnicaETP = ETP_raster.GetRasterBand(1)
+            bandaUnicaETP.SetNoDataValue(self.NoData)
+            ETP_array = np.array(bandaUnicaETP.ReadAsArray()) 
+            ETP_listMes = ETP_array.tolist()
+            ETP_list[contMes].append(ETP_listMes)
+            P_raster = gdal.Open(self.diretorio+"p"+mes+".tif")   
+            bandaUnicaP = P_raster.GetRasterBand(1)
+            bandaUnicaP.SetNoDataValue(self.NoData)
+            P_array = np.array(bandaUnicaP.ReadAsArray()) 
+            P_listMes = P_array.tolist()
+            P_list[contMes].append(P_listMes)
+            contMes += 1
+        
+        percent = 10
+        self.setProgress(percent)
+        amount = len(self.nomeMes)
+        # ---------------- Verificando as condicoes para fazer os calculos ---------------------------
 
-            for matriz in range(len(CAD_list)):
-                for row_cont in range(len(CAD_list[matriz])):
-                    for item in range(len(CAD_list[matriz][row_cont])):
-                        CADFloatAll.append(CAD_list[matriz][row_cont][item])
+        for mes in self.nomeMes:
+            #--- calculate a aprox size to put in the progress bar  
+            bit = (20-percent) / amount   # max until this point - last point / len
+            percent += bit # beggins the point at 10% 
+            self.setProgress(percent)
+            #-------------------------------------------------------------
+            CAD_raster = gdal.Open(self.diretorio+"cad.tif")
+            ETP_raster = gdal.Open(self.diretorio+"etp"+mes+".tif") 
+            P_raster = gdal.Open(self.diretorio+"p"+mes+".tif")
+            assert CAD_raster.RasterXSize == ETP_raster.RasterXSize == P_raster.RasterXSize 
+            assert CAD_raster.RasterYSize == ETP_raster.RasterYSize == P_raster.RasterYSize 
 
-            for mes in range(len(nomeMes)):
-                for matriz in range(len(ETP_list[mes])):     
-                    for row_cont in range(len(ETP_list[mes][matriz])):
-                        for item in range(len(ETP_list[mes][matriz][row_cont])):
-                            ETPFloatAll[mes].append(ETP_list[mes][matriz][row_cont][item])
-                            PFloatAll[mes].append(P_list[mes][matriz][row_cont][item])
+        #-------------------- Substituindo valores de CAD = 0 por NoData ------------------------------
 
-            #--------------------------- Fazendo o calculo ---------------------------------------------
+        for matriz in range(len(CAD_list)):
+            for row in range(len(CAD_list[matriz])):
+                for i in range(len(CAD_list[matriz][row])):
+                    if CAD_list[matriz][row][i] == 0:
+                        CAD_list[matriz][row].pop(i)    # retira o cad 0 e substitui por NODATA
+                        CAD_list[matriz][row].insert(i,self.NoData)            
 
-            ARM = [[] for i in range(len(nomeMes))]
-            ETR = [[] for i in range(len(nomeMes))]
-            B = [[] for i in range(len(nomeMes))]
+        #-------------------- Retirando as linhas que vem do formato array ------------------------------
 
-            for mes in range(len(nomeMes)):
-                if mes == 0:  # primeiro mes
-                    for cell in range(len(CADFloatAll)):
-                        if PFloatAll[mes][cell] == NoData or ETPFloatAll[mes][cell] == NoData:
-                            ARM[mes].append(NoData) #nao faz o calculo para NoData
+        CADFloatAll = []
+        ETPFloatAll = [[] for mes in self.nomeMes]
+        PFloatAll = [[] for mes in self.nomeMes]
+
+        for matriz in range(len(CAD_list)):
+            for row_cont in range(len(CAD_list[matriz])):
+                for item in range(len(CAD_list[matriz][row_cont])):
+                    CADFloatAll.append(CAD_list[matriz][row_cont][item])
+
+        for mes in range(len(self.nomeMes)):
+            for matriz in range(len(ETP_list[mes])):     
+                for row_cont in range(len(ETP_list[mes][matriz])):
+                    for item in range(len(ETP_list[mes][matriz][row_cont])):
+                        ETPFloatAll[mes].append(ETP_list[mes][matriz][row_cont][item])
+                        PFloatAll[mes].append(P_list[mes][matriz][row_cont][item])
+        
+        percent = 20
+        self.setProgress(percent)
+        #--------------------------- Fazendo o calculo ---------------------------------------------
+
+        ARM = [[] for i in range(len(self.nomeMes))]
+        ETR = [[] for i in range(len(self.nomeMes))]
+        B = [[] for i in range(len(self.nomeMes))]
+
+        for mes in range(amount):
+            #--- calculate a aprox size to put in the progress bar  
+            bit = (50-percent) / amount   # max until this point - last point / len
+            percent += bit # beggins the point at 10% 
+            self.setProgress(percent)
+            #-------------------------------------------------------------
+            if mes == 0:  # primeiro mes
+                for cell in range(len(CADFloatAll)):
+                    if PFloatAll[mes][cell] == self.NoData or ETPFloatAll[mes][cell] == self.NoData:
+                        ARM[mes].append(self.NoData) #nao faz o calculo para NoData
+                    else:
+                        ARM[mes].append(CADFloatAll[cell])
+
+                cont_i = 0
+                for i in PFloatAll[mes]:
+                    if CADFloatAll[cont_i] == self.NoData or PFloatAll[mes][cont_i] == self.NoData or ETPFloatAll[mes][cont_i] == self.NoData:
+                        B[mes].append(self.NoData)     #nao faz o calculo para self.NoData
+                        ETR[mes].append(self.NoData)
+                        cont_i += 1
+                        
+                    elif PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i] > 0: #excesso
+                        if ARM[mes][cont_i] + (PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]) >= CADFloatAll[cont_i]:
+                            B[mes].append(PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]) #sempre para o mes zero B = Pi-ETPi
+                            ETR[mes].append(ETPFloatAll[mes][cont_i])
+                            cont_i += 1
                         else:
-                            ARM[mes].append(CADFloatAll[cell])
-
-                    cont_i = 0
-                    for i in PFloatAll[mes]:
-                        if CADFloatAll[cont_i] == NoData or PFloatAll[mes][cont_i] == NoData or ETPFloatAll[mes][cont_i] == NoData:
-                            B[mes].append(NoData)     #nao faz o calculo para NoData
-                            ETR[mes].append(NoData)
+                            assert ARM[mes][cont_i] + (PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]) >= CADFloatAll[cont_i]#, print("\n"+
+                                #"  ---> COMECOU COM MES ERRADO! O arm anterior deve ser igual a CAD quando roda o modelo a primeira vez! <---  ")
+                            break
+                            
+                    else: # defict   ---> teoricamente nao deveria ter essa possibilidade no primeiro mes,pois deve ser escolhido um mes com P>ETP para iniciar
+                        form = ARM[mes][cont_i] * exp((PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]) / CADFloatAll[cont_i])
+                        if form > 0: 
+                            # Neste primeiro mes, form = ARM do mes em questao (mes zero) e ARM[mes] == ARM do mes anterior
+                            B[mes].append((PFloatAll[mes][cont_i] + (ARM[mes][cont_i] - form)) - ETPFloatAll[mes][cont_i]) 
+                            ARM_mes_anterior = ARM[mes][cont_i] #guarda o valor de arm que vai ser atualizado
+                            ARM[mes].pop(cont_i)
+                            ARM[mes].insert(cont_i,form)
+                            ETR[mes].append(PFloatAll[mes][cont_i] + (ARM_mes_anterior - form)) #teoricamente nao deveria ter ETR no primeiro mes
+                            cont_i += 1                                                         #pois deve ser escolhido um mes com P>ETP para iniciar
+                        else:
+                            assert form > 0#, print("  ---> ERRO MATEMATICO! Nao pode acontecer tal resultado. <---  ")
+                            break
+                            
+            else:  # outros meses
+                cont_i = 0
+                for i in PFloatAll[mes]:
+                    if CADFloatAll[cont_i] == self.NoData or PFloatAll[mes][cont_i] == self.NoData or ETPFloatAll[mes][cont_i] == self.NoData:
+                        B[mes].append(self.NoData)     #nao faz o calculo para NoData
+                        ARM[mes].append(self.NoData)     #nao faz o calculo para NoData
+                        ETR[mes].append(self.NoData)
+                        cont_i += 1
+                        
+                    elif PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i] > 0: #excesso
+                        if ARM[mes-1][cont_i] + (PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]) >= CADFloatAll[cont_i]:
+                            ARM[mes].append(CADFloatAll[cont_i])
+                            ETR[mes].append(ETPFloatAll[mes][cont_i])
+                            B[mes].append(ARM[mes-1][cont_i] + (PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]) - CADFloatAll[cont_i])
+                            cont_i += 1
+                        else:
+                            ARM[mes].append(ARM[mes-1][cont_i] + (PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]))
+                            ETR[mes].append(ETPFloatAll[mes][cont_i])
+                            B[mes].append(0)
                             cont_i += 1
                             
-                        elif PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i] > 0: #excesso
-                            if ARM[mes][cont_i] + (PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]) >= CADFloatAll[cont_i]:
-                                B[mes].append(PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]) #sempre para o mes zero B = Pi-ETPi
-                                ETR[mes].append(ETPFloatAll[mes][cont_i])
-                                cont_i += 1
-                            else:
-                                assert ARM[mes][cont_i] + (PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]) >= CADFloatAll[cont_i]#, print("\n"+
-                                    #"  ---> COMECOU COM MES ERRADO! O arm anterior deve ser igual a CAD quando roda o modelo a primeira vez! <---  ")
-                                break
-                                
-                        else: # defict   ---> teoricamente nao deveria ter essa possibilidade no primeiro mes,pois deve ser escolhido um mes com P>ETP para iniciar
-                            form = ARM[mes][cont_i] * exp((PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]) / CADFloatAll[cont_i])
-                            if form > 0: 
-                                # Neste primeiro mes, form = ARM do mes em questao (mes zero) e ARM[mes] == ARM do mes anterior
-                                B[mes].append((PFloatAll[mes][cont_i] + (ARM[mes][cont_i] - form)) - ETPFloatAll[mes][cont_i]) 
-                                ARM_mes_anterior = ARM[mes][cont_i] #guarda o valor de arm que vai ser atualizado
-                                ARM[mes].pop(cont_i)
-                                ARM[mes].insert(cont_i,form)
-                                ETR[mes].append(PFloatAll[mes][cont_i] + (ARM_mes_anterior - form)) #teoricamente nao deveria ter ETR no primeiro mes
-                                cont_i += 1                                                         #pois deve ser escolhido um mes com P>ETP para iniciar
-                            else:
-                                assert form > 0#, print("  ---> ERRO MATEMATICO! Nao pode acontecer tal resultado. <---  ")
-                                break
-                                
-                else:  # outros meses
-                    cont_i = 0
-                    for i in PFloatAll[mes]:
-                        if CADFloatAll[cont_i] == NoData or PFloatAll[mes][cont_i] == NoData or ETPFloatAll[mes][cont_i] == NoData:
-                            B[mes].append(NoData)     #nao faz o calculo para NoData
-                            ARM[mes].append(NoData)     #nao faz o calculo para NoData
-                            ETR[mes].append(NoData)
+                    else: # defict
+                        form = ARM[mes-1][cont_i] * exp((PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]) / CADFloatAll[cont_i])
+                        if form > 0:
+                            ARM[mes].append(form)
+                            ETR[mes].append(PFloatAll[mes][cont_i] + (ARM[mes-1][cont_i]-ARM[mes][cont_i]))
+                            B[mes].append((PFloatAll[mes][cont_i] + (ARM[mes-1][cont_i]-ARM[mes][cont_i])) - ETPFloatAll[mes][cont_i])
                             cont_i += 1
-                            
-                        elif PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i] > 0: #excesso
-                            if ARM[mes-1][cont_i] + (PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]) >= CADFloatAll[cont_i]:
-                                ARM[mes].append(CADFloatAll[cont_i])
-                                ETR[mes].append(ETPFloatAll[mes][cont_i])
-                                B[mes].append(ARM[mes-1][cont_i] + (PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]) - CADFloatAll[cont_i])
-                                cont_i += 1
-                            else:
-                                ARM[mes].append(ARM[mes-1][cont_i] + (PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]))
-                                ETR[mes].append(ETPFloatAll[mes][cont_i])
-                                B[mes].append(0)
-                                cont_i += 1
-                                
-                        else: # defict
-                            form = ARM[mes-1][cont_i] * exp((PFloatAll[mes][cont_i] - ETPFloatAll[mes][cont_i]) / CADFloatAll[cont_i])
-                            if form > 0:
-                                ARM[mes].append(form)
-                                ETR[mes].append(PFloatAll[mes][cont_i] + (ARM[mes-1][cont_i]-ARM[mes][cont_i]))
-                                B[mes].append((PFloatAll[mes][cont_i] + (ARM[mes-1][cont_i]-ARM[mes][cont_i])) - ETPFloatAll[mes][cont_i])
-                                cont_i += 1
-                            else:
-                                assert form > 0#, print("  ---> ERRO MATEMATICO! Nao pode acontecer tal resultado. <---  ")
-                                break
+                        else:
+                            assert form > 0#, print("  ---> ERRO MATEMATICO! Nao pode acontecer tal resultado. <---  ")
+                            break
+        percent = 50
+        self.setProgress(percent)
+        if BHCgeo_QGIS.dlg.checkBox_PR.isChecked():    # <-----
 
-            if self.dlg.checkBox_PR.isChecked():
+            # ---------------------------- PROVA REAL -------------------------------------
 
-                # ---------------------------- PROVA REAL -------------------------------------
-
-                listaRelatorio = []                
-                texto = QCoreApplication.translate('report', '''The Verification Proof checks if the following conditions were respected, in each pixel:
-                
+            listaRelatorio = []                
+            texto = QCoreApplication.translate('report', '''The Verification Proof checks if the following conditions were respected, in each pixel:
+            
     Sum(ETP) = Sum(ETR)+Sum(DEF)
     Sum(P) = Sum(ETR)+Sum(EXC)
     Sum(Alt) = 0
@@ -419,182 +477,277 @@ smaller areas to better represent their climatological characteristics.
     ******************************* REPORT ******************************
             ''')
 
-                listaRelatorio.append(texto)
+            listaRelatorio.append(texto)
 
-                somatorioP = [ [] for cell in CADFloatAll ]  #somatorio por pixel
-                somatorioETP = [ [] for cell in CADFloatAll ]
-                somatorioETR = [ [] for cell in CADFloatAll ]
-                somatorioDEF = [ [] for cell in CADFloatAll ]
-                somatorioEXC = [ [] for cell in CADFloatAll ]
-                somatorioAlt = [ [] for cell in CADFloatAll ]
+            somatorioP = [ [] for cell in CADFloatAll ]  #somatorio por pixel
+            somatorioETP = [ [] for cell in CADFloatAll ]
+            somatorioETR = [ [] for cell in CADFloatAll ]
+            somatorioDEF = [ [] for cell in CADFloatAll ]
+            somatorioEXC = [ [] for cell in CADFloatAll ]
+            somatorioAlt = [ [] for cell in CADFloatAll ]
 
-                for cell in range(len(CADFloatAll)):
-                    for mes in range(len(nomeMes)):
-                        if ETR[mes][cell] == NoData:  # B[mes][cell] == NoData or PFloatAll[mes][cell] == NoData or ETPFloatAll[mes][cell] == NoData:
-                            somatorioP[cell].append(NoData)
-                            somatorioETP[cell].append(NoData)
-                            somatorioETR[cell].append(NoData)
-                            somatorioEXC[cell].append(NoData)
-                            somatorioDEF[cell].append(NoData)
-                            somatorioAlt[cell].append(NoData)
-                        else:
-                            somatorioP[cell].append(PFloatAll[mes][cell])
-                            somatorioETP[cell].append(ETPFloatAll[mes][cell])
-                            somatorioETR[cell].append(ETR[mes][cell])
-                            somatorioAlt[cell].append(ARM[mes][cell]-ARM[mes-1][cell])
-
-                            if B[mes][cell] > 0:
-                                somatorioEXC[cell].append(B[mes][cell])
-                            else:
-                                somatorioDEF[cell].append(B[mes][cell]) 
-
-                for cell in range(len(CADFloatAll)):
-                    if NoData in somatorioETR[cell]: # pois ETR eh saida com NoData nos lugares certos
-                        pass
+            amount_cell = len(CADFloatAll)
+            for cell in range(amount_cell):
+                #--- calculate a aprox size to put in the progress bar  
+                bit = (60-percent) / amount_cell   # max until this point - last point / len
+                percent += bit # beggins the point at 10% 
+                self.setProgress(percent)
+                #-------------------------------------------------------------
+                for mes in range(len(self.nomeMes)):
+                    if ETR[mes][cell] == self.NoData:  # B[mes][cell] == NoData or PFloatAll[mes][cell] == NoData or ETPFloatAll[mes][cell] == NoData:
+                        somatorioP[cell].append(self.NoData)
+                        somatorioETP[cell].append(self.NoData)
+                        somatorioETR[cell].append(self.NoData)
+                        somatorioEXC[cell].append(self.NoData)
+                        somatorioDEF[cell].append(self.NoData)
+                        somatorioAlt[cell].append(self.NoData)
                     else:
-                        arredondandoSomETP = sum(somatorioETP[cell])
-                        arredondandoSomP = sum(somatorioP[cell])
-                        arredondandoSomETR = sum(somatorioETR[cell])
-                        arredondandoSomDEF = abs(sum(somatorioDEF[cell]))
-                        arredondandoSomEXC = sum(somatorioEXC[cell])
-                        arredondandoSomAlt = sum(somatorioAlt[cell])
+                        somatorioP[cell].append(PFloatAll[mes][cell])
+                        somatorioETP[cell].append(ETPFloatAll[mes][cell])
+                        somatorioETR[cell].append(ETR[mes][cell])
+                        somatorioAlt[cell].append(ARM[mes][cell]-ARM[mes-1][cell])
 
-                        if arredondandoSomETP == arredondandoSomETR + arredondandoSomDEF:
-                            erro = "SEM ERRO"
-                        elif abs(arredondandoSomETP - (arredondandoSomETR + arredondandoSomDEF)) < 1: #limite aceitavel, em mm, para fins de arredondamento
-                            erro = "SEM ERRO"
-                        else: 
-                            mensagemRelatorio = ("\nPixel: "+str(cell)+"\n"+
-                                QCoreApplication.translate("mensagemRelatorio","Sum(ETP): ")+
-                                str(arredondandoSomETP)+"\n"+
-                                QCoreApplication.translate("mensagemRelatorio","Sum(ETR)+Sum(DEF): ")+
-                                str(arredondandoSomETR+arredondandoSomDEF)+"\n\n"+
-                                QCoreApplication.translate("mensagemRelatorio", 
-                                "In this pixel, the Verification Proof found a possible error. Choose another month to start with."))
-                            listaRelatorio.append(mensagemRelatorio+"\n")
-                            erro = "ERRO"
-                            break
-                        if arredondandoSomP == arredondandoSomETR + arredondandoSomEXC:
-                            erro = "SEM ERRO"
-                        elif abs(arredondandoSomP - (arredondandoSomETR + arredondandoSomEXC)) < 1: #limite aceitavel, em mm, para fins de arredondamento
-                            erro = "SEM ERRO"
-                        else: 
-                            mensagemRelatorio = ("\nPixel: "+str(cell)+"\n"+
-                                QCoreApplication.translate("mensagemRelatorio","Sum(P): ")+
-                                str(arredondandoSomP)+"\n"+
-                                QCoreApplication.translate("mensagemRelatorio","Sum(ETR)+Sum(EXC): ")+
-                                str(arredondandoSomETR+arredondandoSomEXC)+"\n\n"+
-                                QCoreApplication.translate("mensagemRelatorio", 
-                                "In this pixel, the Verification Proof found a possible error. Choose another month to start with."))
-                            listaRelatorio.append(mensagemRelatorio+"\n")
-                            erro = "ERRO"
-                            break
-                        if arredondandoSomAlt == 0:
-                            erro = "SEM ERRO"
-                        elif arredondandoSomAlt < 1:
-                            erro = "SEM ERRO"
+                        if B[mes][cell] > 0:
+                            somatorioEXC[cell].append(B[mes][cell])
                         else:
-                            mensagemRelatorio = ("\nPixel: "+str(cell)+"\n"+
-                                QCoreApplication.translate("mensagemRelatorio","Sum(Alt): ")+
-                                str(arredondandoSomAlt)+"\n\n"+
-                                QCoreApplication.translate("mensagemRelatorio",
-                                "In this pixel, the Verification Proof found a possible error. Choose another month to start with"))
-                            listaRelatorio.append(mensagemRelatorio+"\n")
-                            erro = "ERRO"
-                            break                            
-                        
-                if erro == "ERRO":
-                    mensagemRelatorio = QCoreApplication.translate("mensagemRelatorio",
+                            somatorioDEF[cell].append(B[mes][cell]) 
+
+            self.setProgress(60)
+
+            for cell in range(len(CADFloatAll)):
+                #--- calculate a aprox size to put in the progress bar  
+                bit = (70-percent) / amount_cell   # max until this point - last point / len
+                percent += bit # beggins the point at 10% 
+                self.setProgress(percent)
+                #-------------------------------------------------------------
+                if self.NoData in somatorioETR[cell]: # pois ETR eh saida com NoData nos lugares certos
+                    pass
+                else:
+                    arredondandoSomETP = sum(somatorioETP[cell])
+                    arredondandoSomP = sum(somatorioP[cell])
+                    arredondandoSomETR = sum(somatorioETR[cell])
+                    arredondandoSomDEF = abs(sum(somatorioDEF[cell]))
+                    arredondandoSomEXC = sum(somatorioEXC[cell])
+                    arredondandoSomAlt = sum(somatorioAlt[cell])
+
+                    if arredondandoSomETP == arredondandoSomETR + arredondandoSomDEF:
+                        erro = "SEM ERRO"
+                    elif abs(arredondandoSomETP - (arredondandoSomETR + arredondandoSomDEF)) < 1: #limite aceitavel, em mm, para fins de arredondamento
+                        erro = "SEM ERRO"
+                    else: 
+                        mensagemRelatorio = ("\nPixel: "+str(cell)+"\n"+
+                            QCoreApplication.translate("mensagemRelatorio","Sum(ETP): ")+
+                            str(arredondandoSomETP)+"\n"+
+                            QCoreApplication.translate("mensagemRelatorio","Sum(ETR)+Sum(DEF): ")+
+                            str(arredondandoSomETR+arredondandoSomDEF)+"\n\n"+
+                            QCoreApplication.translate("mensagemRelatorio", 
+                            "In this pixel, the Verification Proof found a possible error. Choose another month to start with."))
+                        listaRelatorio.append(mensagemRelatorio+"\n")
+                        erro = "ERRO"
+                        break
+                    if arredondandoSomP == arredondandoSomETR + arredondandoSomEXC:
+                        erro = "SEM ERRO"
+                    elif abs(arredondandoSomP - (arredondandoSomETR + arredondandoSomEXC)) < 1: #limite aceitavel, em mm, para fins de arredondamento
+                        erro = "SEM ERRO"
+                    else: 
+                        mensagemRelatorio = ("\nPixel: "+str(cell)+"\n"+
+                            QCoreApplication.translate("mensagemRelatorio","Sum(P): ")+
+                            str(arredondandoSomP)+"\n"+
+                            QCoreApplication.translate("mensagemRelatorio","Sum(ETR)+Sum(EXC): ")+
+                            str(arredondandoSomETR+arredondandoSomEXC)+"\n\n"+
+                            QCoreApplication.translate("mensagemRelatorio", 
+                            "In this pixel, the Verification Proof found a possible error. Choose another month to start with."))
+                        listaRelatorio.append(mensagemRelatorio+"\n")
+                        erro = "ERRO"
+                        break
+                    if arredondandoSomAlt == 0:
+                        erro = "SEM ERRO"
+                    elif arredondandoSomAlt < 1:
+                        erro = "SEM ERRO"
+                    else:
+                        mensagemRelatorio = ("\nPixel: "+str(cell)+"\n"+
+                            QCoreApplication.translate("mensagemRelatorio","Sum(Alt): ")+
+                            str(arredondandoSomAlt)+"\n\n"+
+                            QCoreApplication.translate("mensagemRelatorio",
+                            "In this pixel, the Verification Proof found a possible error. Choose another month to start with"))
+                        listaRelatorio.append(mensagemRelatorio+"\n")
+                        erro = "ERRO"
+                        break                            
+                    
+            if erro == "ERRO":
+                mensagemRelatorio = QCoreApplication.translate("mensagemRelatorio",
 '''\n--> The Verification Proof found out, in at least one pixel, the existence of a possible error.
 
-            ***** CONSIDER GETTING STARTED WITH ANOTHER MONTH *****''')
-                    listaRelatorio.append(mensagemRelatorio+"\n")
-                elif erro == "SEM ERRO":
-                    mensagemRelatorio = QCoreApplication.translate("mensagemRelatorio",
+        ***** CONSIDER GETTING STARTED WITH ANOTHER MONTH *****''')
+                listaRelatorio.append(mensagemRelatorio+"\n")
+            elif erro == "SEM ERRO":
+                mensagemRelatorio = QCoreApplication.translate("mensagemRelatorio",
 '''\n--> The Verification Proof found out that the conditions of equality, according to the formulas,
 were maintained in all pixels.''')
-                    listaRelatorio.append(mensagemRelatorio+"\n")
-                else:
-                    mensagemRelatorio = str(erro) # nunca deve acontecer
-                    listaRelatorio.append(mensagemRelatorio+"\n")
-                    
-                abrirRelatorio = io.open(diretorio+QCoreApplication.translate("mensagemRelatorio",
-                    "Report.txt"), mode="w", encoding="utf-8")
-                for i in listaRelatorio:
-                    abrirRelatorio.write(unicode(i))
-                abrirRelatorio.close()
+                listaRelatorio.append(mensagemRelatorio+"\n")
+            else:
+                mensagemRelatorio = str(erro) # nunca deve acontecer
+                listaRelatorio.append(mensagemRelatorio+"\n")
                 
-            # -------------------- Criando os Rasters Finais -------------------------------
+            abrirRelatorio = io.open(self.diretorio+QCoreApplication.translate("mensagemRelatorio",
+                "Report.txt"), mode="w", encoding="utf-8")
+            for i in listaRelatorio:
+                abrirRelatorio.write(unicode(i))
+            abrirRelatorio.close()
+            
+        # -------------------- Criando os Rasters Finais -------------------------------
+        percent = 70
+        self.setProgress(percent)
+        B_array = [[[] for rows in CAD_array] for mes in self.nomeMes]  # cria os espacos para os rows que tem nos arquivos de entrada, para virar array
+        ARM_array = [[[] for rows in CAD_array] for mes in self.nomeMes]
+        ETR_array = [[[] for rows in CAD_array] for mes in self.nomeMes]
 
-            B_array = [[[] for rows in CAD_array] for mes in nomeMes]  # cria os espacos para os rows que tem nos arquivos de entrada, para virar array
-            ARM_array = [[[] for rows in CAD_array] for mes in nomeMes]
-            ETR_array = [[[] for rows in CAD_array] for mes in nomeMes]
+        for mes in range(len(self.nomeMes)):
+            item_cont = 0
+            for row in range(len(CAD_array)):
+                for item in range(len(CAD_array[row])):
+                    B_array[mes][row].append(B[mes][item_cont])
+                    ARM_array[mes][row].append(ARM[mes][item_cont])
+                    ETR_array[mes][row].append(ETR[mes][item_cont])
+                    item_cont += 1 
 
-            for mes in range(len(nomeMes)):
-                item_cont = 0
-                for row in range(len(CAD_array)):
-                    for item in range(len(CAD_array[row])):
-                        B_array[mes][row].append(B[mes][item_cont])
-                        ARM_array[mes][row].append(ARM[mes][item_cont])
-                        ETR_array[mes][row].append(ETR[mes][item_cont])
-                        item_cont += 1 
+        dataset = gdal.Open(self.diretorio+'cad.tif') #raster modelo de tamanho pixel
+        geotransform = dataset.GetGeoTransform()
+        if geotransform:
+            self.instantiatePixelWidth = geotransform[1]
+            self.instantiatePixelHeight = geotransform[5]
 
-            dataset = gdal.Open(diretorio+'cad.tif') #raster modelo de tamanho pixel
-            geotransform = dataset.GetGeoTransform()
-            if geotransform:
-                instantiatePixelWidth = geotransform[1]
-                instantiatePixelHeight = geotransform[5]
+        rasterModelo = self.diretorio+'cad.tif'  # usa os parametros do raster modelo
+
+        if BHCgeo_QGIS.dlg.checkBox_B.isChecked():   # <-----
+            contMes = 0
+            for mes in self.nomeMes:
+                rasterSaidaB = self.diretorio+'b'+mes+'.tif'
+                my_array_B = np.array(B_array[contMes])
+                self.saida_BHC = self.array2raster(rasterModelo, rasterSaidaB, my_array_B)
+                #iface.addRasterLayer(saida_BHC)  #tem que adicionar .self para que funcione, pois iface foi referenciado la em cima
+                contMes += 1
+                #--- calculate a aprox size to put in the progress bar  
+                bit = (70-percent) / amount   # max until this point - last point / len
+                percent += bit # beggins the point at 10% 
+                self.setProgress(percent)
+                #-------------------------------------------------------------
+        
+        percent = 80
+        self.setProgress(percent)
+        if BHCgeo_QGIS.dlg.checkBox_ETR.isChecked():   # <-----
+            contMes = 0
+            for mes in self.nomeMes:
+                rasterSaidaETR = self.diretorio+'etr'+mes+'.tif'
+                my_array_ETR = np.array(ETR_array[contMes])
+                self.saida_ETR = self.array2raster(rasterModelo, rasterSaidaETR, my_array_ETR)
+                #iface.addRasterLayer(saida_ETR)     #tem que adicionar .self para que funcione, pois iface foi referenciado la em cima
+                contMes += 1
+                #--- calculate a aprox size to put in the progress bar  
+                bit = (80-percent) / amount   # max until this point - last point / len
+                percent += bit # beggins the point at 10% 
+                self.setProgress(percent)
+                #-------------------------------------------------------------
+        
+        percent = 90
+        self.setProgress(percent)
+        if BHCgeo_QGIS.dlg.checkBox_ARM.isChecked():   # <-----
+            contMes = 0
+            for mes in self.nomeMes:
+                rasterSaidaARM = self.diretorio+'arm'+mes+'.tif'
+                my_array_ARM = np.array(ARM_array[contMes])
+                self.saida_ARM = self.array2raster(rasterModelo, rasterSaidaARM, my_array_ARM)
+                #iface.addRasterLayer(saida_ARM)     #tem que adicionar .self para que funcione, pois iface foi referenciado la em cima
+                contMes += 1
+                #--- calculate a aprox size to put in the progress bar  
+                bit = (99-percent) / amount   # max until this point - last point / len
+                percent += bit # beggins the point at 10% 
+                self.setProgress(percent)
+                #-------------------------------------------------------------
                 
-            def array2raster(rasterfn,newRasterfn,array):
-                raster = gdal.Open(rasterfn) #raster modelo
-                geotransform = raster.GetGeoTransform()
-                originX = geotransform[0] 
-                originY = geotransform[3]
-                pixelWidth = instantiatePixelWidth
-                pixelHeight = instantiatePixelHeight
-                cols = raster.RasterXSize
-                rows = raster.RasterYSize
+        percent = 99
+        self.setProgress(percent)
+        return True
 
-                driver = gdal.GetDriverByName('GTiff')
-                outRaster = driver.Create(newRasterfn, cols, rows, 1, gdal.GDT_Float32)
-                outRaster.SetGeoTransform((originX, pixelWidth, 0, originY, 0, pixelHeight))
-                outband = outRaster.GetRasterBand(1)
-                outband.WriteArray(array)
-                outband.SetNoDataValue(NoData) #nao insere valor de NoData, mas sim, escolhe um valor dentre os existentes
-                outRasterSRS = osr.SpatialReference()
-                outRasterSRS.ImportFromWkt(raster.GetProjectionRef())
-                outRaster.SetProjection(outRasterSRS.ExportToWkt())
-                outband.FlushCache()
 
-            rasterModelo = diretorio+'cad.tif'  # usa os parametros do raster modelo
+    def finished(self, result):
+        """This function is called automatically when the task is completed and is
+        called from the main thread so it is safe to interact with the GUI etc here"""
+        if result is False:
+            iface.messageBar().pushMessage('Task was cancelled')
+        else:
+            iface.messageBar().clearWidgets()
+            for mes in self.nomeMes:
+                if BHCgeo_QGIS.dlg.checkBox_B.isChecked(): 
+                    iface.addRasterLayer(self.diretorio+'b'+mes+'.tif')
+                if BHCgeo_QGIS.dlg.checkBox_ETR.isChecked():
+                    iface.addRasterLayer(self.diretorio+'etr'+mes+'.tif')
+                if BHCgeo_QGIS.dlg.checkBox_ARM.isChecked():  
+                    iface.addRasterLayer(self.diretorio+'arm'+mes+'.tif')
+                percent = 100
+                self.setProgress(percent)
+                iface.messageBar().pushMessage('Complete')
+                #ProgessBar.btn_cancel.setEnabled(False)
 
-            if self.dlg.checkBox_B.isChecked():
-                contMes = 0
-                for mes in nomeMes:
-                    rasterSaidaB = diretorio+'b'+mes+'.tif'
-                    my_array_B = np.array(B_array[contMes])
-                    array2raster(rasterModelo, rasterSaidaB, my_array_B)
-                    self.iface.addRasterLayer(rasterSaidaB, 'b'+mes)  #tem que adicionar .self para que funcione, pois iface foi referenciado la em cima
-                    contMes += 1
 
-            if self.dlg.checkBox_ETR.isChecked():
-                contMes = 0
-                for mes in nomeMes:
-                    rasterSaidaETR = diretorio+'etr'+mes+'.tif'
-                    my_array_ETR = np.array(ETR_array[contMes])
-                    array2raster(rasterModelo, rasterSaidaETR, my_array_ETR)
-                    self.iface.addRasterLayer(rasterSaidaETR, 'etr'+mes)     #tem que adicionar .self para que funcione, pois iface foi referenciado la em cima
-                    contMes += 1
 
-            if self.dlg.checkBox_ARM.isChecked():
-                contMes = 0
-                for mes in nomeMes:
-                    rasterSaidaARM = diretorio+'arm'+mes+'.tif'
-                    my_array_ARM = np.array(ARM_array[contMes])
-                    array2raster(rasterModelo, rasterSaidaARM, my_array_ARM)
-                    self.iface.addRasterLayer(rasterSaidaARM, 'arm'+mes)     #tem que adicionar .self para que funcione, pois iface foi referenciado la em cima
-                    contMes += 1
+class ProgessBar(QDialog):
+    def __init__(self, parent=None):
+        QDialog.__init__(self, parent)
+        self.resize(310, 140)
+        self.lbl_info = QLabel('Info:', self) 
+        self.lbl_info.move(40, 25) # label with Info
+        self.edit_info = QLineEdit(self)
+        self.edit_info.resize(170, 20)
+        self.edit_info.move(100, 20) # Show changing messages
+        self.prog = QProgressBar(self)
+        self.prog.resize(230, 30)
+        self.prog.move(40, 55) 
+        self.newTask('BHCgeo')
+        btn_close = QPushButton('Close',self)
+        btn_close.move(190, 100)
+        btn_close.clicked.connect(self.close_win)
+        # ProgessBar.btn_cancel = QPushButton('Cancel Task', self)
+        # ProgessBar.btn_cancel.move(40, 100)
+        # ProgessBar.btn_cancel.clicked.connect(self.cancelTask)
 
-            self.iface.messageBar().pushMessage("BHCgeo",
-                QCoreApplication.translate("mensagemRelatorio","END of the BHCgeo"),
-                level=Qgis.Success, duration=4)
+
+    def newTask(self, message_task_description):
+        """Create a task and add it to the Task Manager"""
+        self.task = HeavyTask(message_task_description)
+        #connect to signals from the background threads to perform gui operations
+        #such as updating the progress bar
+        self.task.begun.connect(lambda: self.edit_info.setText("Calculating..."))
+        self.task.progressChanged.connect(lambda: self.prog.setValue(self.task.progress()))
+        self.task.progressChanged.connect(lambda: self.setProgressBarMessages(self.task.progress()))
+        self.task.taskCompleted.connect(lambda: self.edit_info.setText('Complete'))
+        self.task.taskTerminated.connect(self.TaskCancelled)
+        QgsApplication.taskManager().addTask(self.task)
+
+
+    def TaskCancelled(self):
+        self.prog.setValue(0)
+        self.edit_info.setText('Task Cancelled')
+
+
+    def close_win(self):
+        self.close()
+
+
+    def setProgressBarMessages(self, val):
+    # --- Progress bar in the QGIS user messages (top)
+        if val <= 30:
+            message = "Starting..."
+            iface.messageBar().pushMessage(message)
+        elif val < 60:
+            message = "Calculating water balance..."
+            iface.messageBar().pushMessage(message)
+        elif val < 100:
+            message = "Preparing final raster..."
+            iface.messageBar().pushMessage(message)
+        # elif val == 100:
+        #     iface.messageBar().clearWidgets()
+
+
+    # def cancelTask(self):
+    #     self.task.cancel()
