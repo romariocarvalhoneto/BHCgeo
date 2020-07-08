@@ -10,7 +10,7 @@
 name=BHCgeo
 qgisMinimumVersion=3.0
 description=Calculates the Climatic Water Balance in each pixel
-version=0.1
+version=0.2
 author=Carvalho Neto, R.M. - UFSM; Cruz, J.C. - UFSM; Cruz, R.C. - UNIPAMPA
 email=romariocarvalho@hotmail.com
 
@@ -23,10 +23,10 @@ repository=https://github.com/romariocarvalhoneto/BHCgeo
 # Recommended items:
 
 # Uncomment the following line and add your changelog:
-# changelog=
+changelog=Added progress bar
 
 # Tags are comma separated with spaces allowed
-tags=raster,climatic water balance,climate changes
+tags=raster,climatic,water,balance,climate,changes,BHC,CWB,real,evapotranspiration
 
 homepage=https://github.com/romariocarvalhoneto/BHCgeo
 category=Raster
@@ -36,4 +36,3 @@ experimental=True
 
 # deprecated flag (applies to the whole plugin, not just a single version)
 deprecated=False
-
