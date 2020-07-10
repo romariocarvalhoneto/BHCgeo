@@ -23,7 +23,7 @@ repository=https://github.com/romariocarvalhoneto/BHCgeo
 # Recommended items:
 
 # Uncomment the following line and add your changelog:
-changelog=Added progress bar
+changelog=Added progress bar and new icon.
 
 # Tags are comma separated with spaces allowed
 tags=raster,climatic,water,balance,climate,changes,BHC,CWB,real,evapotranspiration

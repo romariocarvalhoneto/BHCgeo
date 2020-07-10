@@ -58,7 +58,7 @@ class BHCgeo_QGIS:
         locale_path = os.path.join(
             self.plugin_dir,
             'i18n',
-            'BHCgeo_QGIS_{}.qm'.format(locale))
+            'bhcgeoqgis_{}.qm'.format(locale))
 
         if os.path.exists(locale_path):
             self.translator = QTranslator()
@@ -674,7 +674,7 @@ were maintained in all pixels.''')
         """This function is called automatically when the task is completed and is
         called from the main thread so it is safe to interact with the GUI etc here"""
         if result is False:
-            iface.messageBar().pushMessage('Task was cancelled')
+            iface.messageBar().pushMessage(QCoreApplication.translate('Task message','Task was cancelled'))
         else:
             iface.messageBar().clearWidgets()
             for mes in self.nomeMes:
@@ -686,7 +686,7 @@ were maintained in all pixels.''')
                     iface.addRasterLayer(self.diretorio+'arm'+mes+'.tif')
                 percent = 100
                 self.setProgress(percent)
-                iface.messageBar().pushMessage('Complete')
+                iface.messageBar().pushMessage(QCoreApplication.translate('Task message','Complete'))
                 #ProgessBar.btn_cancel.setEnabled(False)
 
 
@@ -704,7 +704,7 @@ class ProgessBar(QDialog):
         self.prog.resize(230, 30)
         self.prog.move(40, 55) 
         self.newTask('BHCgeo')
-        btn_close = QPushButton('Close',self)
+        btn_close = QPushButton(QCoreApplication.translate('Task message','Close'),self)
         btn_close.move(190, 100)
         btn_close.clicked.connect(self.close_win)
         # ProgessBar.btn_cancel = QPushButton('Cancel Task', self)
@@ -717,17 +717,17 @@ class ProgessBar(QDialog):
         self.task = HeavyTask(message_task_description)
         #connect to signals from the background threads to perform gui operations
         #such as updating the progress bar
-        self.task.begun.connect(lambda: self.edit_info.setText("Calculating..."))
+        self.task.begun.connect(lambda: self.edit_info.setText(QCoreApplication.translate("Task message","Calculating...")))
         self.task.progressChanged.connect(lambda: self.prog.setValue(self.task.progress()))
         self.task.progressChanged.connect(lambda: self.setProgressBarMessages(self.task.progress()))
-        self.task.taskCompleted.connect(lambda: self.edit_info.setText('Complete'))
+        self.task.taskCompleted.connect(lambda: self.edit_info.setText(QCoreApplication.translate('Task message','Complete')))
         self.task.taskTerminated.connect(self.TaskCancelled)
         QgsApplication.taskManager().addTask(self.task)
 
 
     def TaskCancelled(self):
         self.prog.setValue(0)
-        self.edit_info.setText('Task Cancelled')
+        self.edit_info.setText(QCoreApplication.translate('Task message','Task Cancelled'))
 
 
     def close_win(self):
@@ -737,13 +737,13 @@ class ProgessBar(QDialog):
     def setProgressBarMessages(self, val):
     # --- Progress bar in the QGIS user messages (top)
         if val <= 30:
-            message = "Starting..."
+            message = QCoreApplication.translate("Task message","Starting...")
             iface.messageBar().pushMessage(message)
         elif val < 60:
-            message = "Calculating water balance..."
+            message = QCoreApplication.translate("Task message","Calculating water balance...")
             iface.messageBar().pushMessage(message)
         elif val < 100:
-            message = "Preparing final raster..."
+            message = QCoreApplication.translate("Task message","Preparing final raster...")
             iface.messageBar().pushMessage(message)
         # elif val == 100:
         #     iface.messageBar().clearWidgets()
