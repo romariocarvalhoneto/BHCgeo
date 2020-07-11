@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
-<TS version="2.1" language="pt" sourcelanguage="en">
+<TS version="2.1" language="pt_BR" sourcelanguage="en">
 <context>
     <name>BHCgeoQGISDialogBase</name>
     <message>
@@ -92,66 +92,109 @@ p, li { white-space: pre-wrap; }
 <context>
     <name>BHCgeo_QGIS</name>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="184"/>
+        <location filename="../BHCgeoQGIS.py" line="185"/>
         <source>&amp;BHCgeo</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="171"/>
+        <location filename="../BHCgeoQGIS.py" line="172"/>
         <source>BHCgeo</source>
         <translation></translation>
     </message>
 </context>
 <context>
+    <name>Task message</name>
+    <message>
+        <location filename="../BHCgeoQGIS.py" line="677"/>
+        <source>Task was cancelled</source>
+        <translation>A tarefa (Task) foi cancelada</translation>
+    </message>
+    <message>
+        <location filename="../BHCgeoQGIS.py" line="723"/>
+        <source>Complete</source>
+        <translation>Completo</translation>
+    </message>
+    <message>
+        <location filename="../BHCgeoQGIS.py" line="707"/>
+        <source>Close</source>
+        <translation>Fechar</translation>
+    </message>
+    <message>
+        <location filename="../BHCgeoQGIS.py" line="720"/>
+        <source>Calculating...</source>
+        <translation>Calculando...</translation>
+    </message>
+    <message>
+        <location filename="../BHCgeoQGIS.py" line="730"/>
+        <source>Task Cancelled</source>
+        <translation>Cancelado</translation>
+    </message>
+    <message>
+        <location filename="../BHCgeoQGIS.py" line="740"/>
+        <source>Starting...</source>
+        <translation>Começando...</translation>
+    </message>
+    <message>
+        <location filename="../BHCgeoQGIS.py" line="743"/>
+        <source>Calculating water balance...</source>
+        <translation>Calculando balanço hídrico...</translation>
+    </message>
+    <message>
+        <location filename="../BHCgeoQGIS.py" line="746"/>
+        <source>Preparing final raster...</source>
+        <translation>Preparando o raster final...</translation>
+    </message>
+</context>
+<context>
     <name>mensagemRelatorio</name>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="467"/>
+        <location filename="../BHCgeoQGIS.py" line="538"/>
         <source>Sum(ETP): </source>
         <translation>Somatório(ETP): </translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="467"/>
+        <location filename="../BHCgeoQGIS.py" line="538"/>
         <source>Sum(ETR)+Sum(DEF): </source>
         <translation>Somatório(ETR)+Somatório(DEF): </translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="482"/>
+        <location filename="../BHCgeoQGIS.py" line="553"/>
         <source>In this pixel, the Verification Proof found a possible error. Choose another month to start with.</source>
         <translation>Neste pixel, a Prova Real verificou um possível erro. Escolha iniciar em outro mês.</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="482"/>
+        <location filename="../BHCgeoQGIS.py" line="553"/>
         <source>Sum(P): </source>
         <translation>Somatório(P): </translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="482"/>
+        <location filename="../BHCgeoQGIS.py" line="553"/>
         <source>Sum(ETR)+Sum(EXC): </source>
         <translation>Somatório(ETR)+Somatório(EXC): </translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="497"/>
+        <location filename="../BHCgeoQGIS.py" line="568"/>
         <source>Sum(Alt): </source>
         <translation>Somatório(Alt): </translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="497"/>
+        <location filename="../BHCgeoQGIS.py" line="568"/>
         <source>In this pixel, the Verification Proof found a possible error. Choose another month to start with</source>
         <translation>Neste pixel, a Prova Real verificou um possível erro. Escolha iniciar em outro mês</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="507"/>
+        <location filename="../BHCgeoQGIS.py" line="578"/>
         <source>
 --&gt; The Verification Proof found out, in at least one pixel, the existence of a possible error.
 
-            ***** CONSIDER GETTING STARTED WITH ANOTHER MONTH *****</source>
+        ***** CONSIDER GETTING STARTED WITH ANOTHER MONTH *****</source>
         <translation>
 --&gt; A Prova Real verificou, em no mínimo um pixel, a existência de um possível erro.
 
-            ***** CONSIDERE COMEÇAR EM OUTRO MÊS *****</translation>
+        ***** CONSIDERE COMEÇAR EM OUTRO MÊS *****</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="513"/>
+        <location filename="../BHCgeoQGIS.py" line="584"/>
         <source>
 --&gt; The Verification Proof found out that the conditions of equality, according to the formulas,
 were maintained in all pixels.</source>
@@ -160,22 +203,17 @@ were maintained in all pixels.</source>
 foram mantidas em todos os pixeis.</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="521"/>
+        <location filename="../BHCgeoQGIS.py" line="592"/>
         <source>Report.txt</source>
         <translation>Relatório.txt</translation>
-    </message>
-    <message>
-        <location filename="../BHCgeoQGIS.py" line="598"/>
-        <source>END of the BHCgeo</source>
-        <translation>FIM do BHCgeo</translation>
     </message>
 </context>
 <context>
     <name>report</name>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="391"/>
+        <location filename="../BHCgeoQGIS.py" line="449"/>
         <source>The Verification Proof checks if the following conditions were respected, in each pixel:
-                
+            
     Sum(ETP) = Sum(ETR)+Sum(DEF)
     Sum(P) = Sum(ETR)+Sum(EXC)
     Sum(Alt) = 0
@@ -205,7 +243,7 @@ smaller areas to better represent their climatological characteristics.
     ******************************* REPORT ******************************
             </source>
         <translation>A Prova real verifica se as seguintes condições foram respeitadas em cada pixel:
-                
+            
     Somatório(ETP) = Somatório(ETR) + Somatório(DEF)
     Somatório(P) = Somatório(ETR) + Somatório(EXC)
     Somatório(Alt) = 0
@@ -237,62 +275,62 @@ menores, para assim representarem melhor suas características climatológicas.
 <context>
     <name>self.dlg.comboBox</name>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="208"/>
+        <location filename="../BHCgeoQGIS.py" line="209"/>
         <source>January</source>
         <translation>Janeiro</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="209"/>
+        <location filename="../BHCgeoQGIS.py" line="210"/>
         <source>February</source>
         <translation>Fevereiro</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="210"/>
+        <location filename="../BHCgeoQGIS.py" line="211"/>
         <source>March</source>
         <translation>Março</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="211"/>
+        <location filename="../BHCgeoQGIS.py" line="212"/>
         <source>April</source>
         <translation>Abril</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="212"/>
+        <location filename="../BHCgeoQGIS.py" line="213"/>
         <source>May</source>
         <translation>Maio</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="213"/>
+        <location filename="../BHCgeoQGIS.py" line="214"/>
         <source>June</source>
         <translation>Junho</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="214"/>
+        <location filename="../BHCgeoQGIS.py" line="215"/>
         <source>July</source>
         <translation>Julho</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="215"/>
+        <location filename="../BHCgeoQGIS.py" line="216"/>
         <source>August</source>
         <translation>Agosto</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="216"/>
+        <location filename="../BHCgeoQGIS.py" line="217"/>
         <source>September</source>
         <translation>Setembro</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="217"/>
+        <location filename="../BHCgeoQGIS.py" line="218"/>
         <source>October</source>
         <translation>Outubro</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="218"/>
+        <location filename="../BHCgeoQGIS.py" line="219"/>
         <source>November</source>
         <translation>Novembro</translation>
     </message>
     <message>
-        <location filename="../BHCgeoQGIS.py" line="219"/>
+        <location filename="../BHCgeoQGIS.py" line="220"/>
         <source>December</source>
         <translation>Dezembro</translation>
     </message>
