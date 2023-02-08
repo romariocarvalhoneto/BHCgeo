@@ -21,14 +21,14 @@
  *                                                                         *
  ***************************************************************************/
 """
-from PyQt5 import QtGui
-from PyQt5.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, Qt
+from PyQt5.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QAction, QFileDialog, QDialog, QProgressBar
 from PyQt5.QtWidgets import *
 from qgis.utils import iface
-from qgis.core import Qgis, QgsProject, QgsTask, QgsApplication
-import gdal, osr, io
+from qgis.core import QgsTask, QgsApplication
+from osgeo import gdal, osr
+import io
 import numpy as np 
 from math import *
 # Initialize Qt resources from file resources.py
